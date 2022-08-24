@@ -23,9 +23,10 @@ message CredentialsResponse {
 message FetchTokenRequest {
 	string ClientID = 1;
 	string Host = 2;
-	string Realm = 3;
-	string Service = 4;
-	repeated string Scopes = 5;
+	bool Insecure = 3;
+	string Realm = 4;
+	string Service = 5;
+	repeated string Scopes = 6;
 }
 
 message FetchTokenResponse {

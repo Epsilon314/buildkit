@@ -45,7 +45,7 @@ func Pusher(ctx context.Context, resolver remotes.Resolver, ref string) (remotes
 	return &pusher{Pusher: p}, nil
 }
 
-func Push(ctx context.Context, sm *session.Manager, sid string, provider content.Provider, manager content.Manager, dgst digest.Digest, ref string, insecure bool, hosts docker.RegistryHosts, byDigest bool, annotations map[digest.Digest]map[string]string) error {
+func Push(ctx context.Context, sm *session.Manager, sid string, provider content.Provider, manager content.Manager, dgst digest.Digest, ref string, insecure, plainHTTP bool, hosts docker.RegistryHosts, byDigest bool, annotations map[digest.Digest]map[string]string) error {
 	desc := ocispecs.Descriptor{
 		Digest: dgst,
 	}
@@ -69,14 +69,19 @@ func Push(ctx context.Context, sm *session.Manager, sid string, provider content
 	}
 
 	scope := "push"
+
+	rc := resolverconfig.RegistryConfig{}
 	if insecure {
 		insecureTrue := true
-		httpTrue := true
+		rc.Insecure = &insecureTrue
+	}
+	if plainHTTP {
+		plainHTTPTrue := true
+		rc.PlainHTTP = &plainHTTPTrue
+	}
+	if plainHTTP || insecure {
 		hosts = resolver.NewRegistryConfig(map[string]resolverconfig.RegistryConfig{
-			reference.Domain(parsed): {
-				Insecure:  &insecureTrue,
-				PlainHTTP: &httpTrue,
-			},
+			reference.Domain(parsed): rc,
 		})
 		scope += ":insecure"
 	}

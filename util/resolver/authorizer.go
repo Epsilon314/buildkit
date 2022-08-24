@@ -104,16 +104,18 @@ func (a *authHandlerNS) delete(h *authHandler) {
 }
 
 type dockerAuthorizer struct {
-	client *http.Client
+	client   *http.Client
+	insecure bool
 
 	sm       *session.Manager
 	session  session.Group
 	handlers *authHandlerNS
 }
 
-func newDockerAuthorizer(client *http.Client, handlers *authHandlerNS, sm *session.Manager, group session.Group) *dockerAuthorizer {
+func newDockerAuthorizer(client *http.Client, insecure bool, handlers *authHandlerNS, sm *session.Manager, group session.Group) *dockerAuthorizer {
 	return &dockerAuthorizer{
 		client:   client,
+		insecure: insecure,
 		handlers: handlers,
 		sm:       sm,
 		session:  group,
@@ -198,7 +200,7 @@ func (a *dockerAuthorizer) AddResponses(ctx context.Context, responses []*http.R
 			}
 			common.Scopes = parseScopes(append(common.Scopes, oldScopes...)).normalize()
 
-			a.handlers.set(host, session, newAuthHandler(host, a.client, c.Scheme, pubKey, common))
+			a.handlers.set(host, session, newAuthHandler(host, a.insecure, a.client, c.Scheme, pubKey, common))
 
 			return nil
 		} else if c.Scheme == auth.BasicAuth {
@@ -213,7 +215,7 @@ func (a *dockerAuthorizer) AddResponses(ctx context.Context, responses []*http.R
 					Secret:   secret,
 				}
 
-				a.handlers.set(host, session, newAuthHandler(host, a.client, c.Scheme, nil, common))
+				a.handlers.set(host, session, newAuthHandler(host, a.insecure, a.client, c.Scheme, nil, common))
 
 				return nil
 			}
@@ -232,7 +234,8 @@ type authResult struct {
 type authHandler struct {
 	g flightcontrol.Group
 
-	client *http.Client
+	client   *http.Client
+	insecure bool
 
 	// only support basic and bearer schemes
 	scheme auth.AuthenticationScheme
@@ -252,9 +255,10 @@ type authHandler struct {
 	authority *[32]byte
 }
 
-func newAuthHandler(host string, client *http.Client, scheme auth.AuthenticationScheme, authority *[32]byte, opts auth.TokenOptions) *authHandler {
+func newAuthHandler(host string, insecure bool, client *http.Client, scheme auth.AuthenticationScheme, authority *[32]byte, opts auth.TokenOptions) *authHandler {
 	return &authHandler{
 		host:         host,
+		insecure:     insecure,
 		client:       client,
 		scheme:       scheme,
 		common:       opts,
@@ -346,6 +350,7 @@ func (ah *authHandler) fetchToken(ctx context.Context, sm *session.Manager, g se
 		resp, err := sessionauth.FetchToken(ctx, &sessionauth.FetchTokenRequest{
 			ClientID: "buildkit-client",
 			Host:     ah.host,
+			Insecure: ah.insecure,
 			Realm:    to.Realm,
 			Service:  to.Service,
 			Scopes:   to.Scopes,

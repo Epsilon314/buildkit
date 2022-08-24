@@ -82,6 +82,7 @@ func (p *Pool) GetResolver(hosts docker.RegistryHosts, ref, scope string, sm *se
 	}
 
 	key := fmt.Sprintf("%s::%s", name, scope)
+	insecure := strings.Contains(scope, "insecure")
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -90,10 +91,11 @@ func (p *Pool) GetResolver(hosts docker.RegistryHosts, ref, scope string, sm *se
 		h = newAuthHandlerNS(sm)
 		p.m[key] = h
 	}
-	return newResolver(hosts, h, sm, g)
+
+	return newResolver(hosts, insecure, h, sm, g)
 }
 
-func newResolver(hosts docker.RegistryHosts, handler *authHandlerNS, sm *session.Manager, g session.Group) *Resolver {
+func newResolver(hosts docker.RegistryHosts, insecure bool, handler *authHandlerNS, sm *session.Manager, g session.Group) *Resolver {
 	if hosts == nil {
 		hosts = docker.ConfigureDefaultRegistries(
 			docker.WithClient(newDefaultClient()),
@@ -101,10 +103,11 @@ func newResolver(hosts docker.RegistryHosts, handler *authHandlerNS, sm *session
 		)
 	}
 	r := &Resolver{
-		hosts:   hosts,
-		sm:      sm,
-		g:       g,
-		handler: handler,
+		hosts:    hosts,
+		insecure: insecure,
+		sm:       sm,
+		g:        g,
+		handler:  handler,
 	}
 	headers := http.Header{}
 	headers.Set("User-Agent", version.UserAgent())
@@ -118,11 +121,12 @@ func newResolver(hosts docker.RegistryHosts, handler *authHandlerNS, sm *session
 // Resolver is a wrapper around remotes.Resolver
 type Resolver struct {
 	remotes.Resolver
-	hosts   docker.RegistryHosts
-	sm      *session.Manager
-	g       session.Group
-	handler *authHandlerNS
-	auth    *dockerAuthorizer
+	hosts    docker.RegistryHosts
+	insecure bool
+	sm       *session.Manager
+	g        session.Group
+	handler  *authHandlerNS
+	auth     *dockerAuthorizer
 
 	is   images.Store
 	mode source.ResolveMode
@@ -158,7 +162,8 @@ func (r *Resolver) HostsFunc(host string) ([]docker.RegistryHost, error) {
 		// make a copy so authorizer is set on unique instance
 		res := make([]docker.RegistryHost, len(vv))
 		copy(res, vv)
-		auth := newDockerAuthorizer(res[0].Client, r.handler, r.sm, r.g)
+
+		auth := newDockerAuthorizer(res[0].Client, r.insecure, r.handler, r.sm, r.g)
 		for i := range res {
 			res[i].Authorizer = auth
 		}

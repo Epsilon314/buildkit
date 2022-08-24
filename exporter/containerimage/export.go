@@ -38,6 +38,7 @@ const (
 	keyPush             = "push"
 	keyPushByDigest     = "push-by-digest"
 	keyInsecure         = "registry.insecure"
+	keyHttp             = "registry.http"
 	keyUnpack           = "unpack"
 	keyDanglingPrefix   = "dangling-name-prefix"
 	keyNameCanonical    = "name-canonical"
@@ -116,6 +117,16 @@ func (e *imageExporter) Resolve(ctx context.Context, opt map[string]string) (exp
 				return nil, errors.Wrapf(err, "non-bool value specified for %s", k)
 			}
 			i.insecure = b
+		case keyHttp:
+			if v == "" {
+				i.plainHTTP = true
+				continue
+			}
+			b, err := strconv.ParseBool(v)
+			if err != nil {
+				return nil, errors.Wrapf(err, "non-bool value specified for %s", k)
+			}
+			i.plainHTTP = b
 		case keyUnpack:
 			if v == "" {
 				i.unpack = true
@@ -225,6 +236,7 @@ type imageExporterInstance struct {
 	push                bool
 	pushByDigest        bool
 	unpack              bool
+	plainHTTP           bool
 	insecure            bool
 	ociTypes            bool
 	nameCanonical       bool
@@ -353,7 +365,7 @@ func (e *imageExporterInstance) Export(ctx context.Context, src exporter.Source,
 					}
 				}
 
-				if err := push.Push(ctx, e.opt.SessionManager, sessionID, mprovider, e.opt.ImageWriter.ContentStore(), desc.Digest, targetName, e.insecure, e.opt.RegistryHosts, e.pushByDigest, annotations); err != nil {
+				if err := push.Push(ctx, e.opt.SessionManager, sessionID, mprovider, e.opt.ImageWriter.ContentStore(), desc.Digest, targetName, e.insecure, e.plainHTTP, e.opt.RegistryHosts, e.pushByDigest, annotations); err != nil {
 					return nil, err
 				}
 			}

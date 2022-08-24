@@ -1,5 +1,12 @@
 bin
 coverage
 release-out
-.certs
-.tmp
+
+# ignore all hidden file (e.g. IDE files)
+.*
+# except:
+!.dockerignore
+!.gitignore
+!.golangci.yml
+!.mailmap
+!.yamllint.yml
